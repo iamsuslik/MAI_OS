@@ -1,10 +1,10 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include "sorting.h"
-
 
 static void write_exit(const char *msg) {
     size_t len = strlen(msg);
@@ -28,6 +28,8 @@ int main(int argc, char **argv) {
         write_exit("Ошибка: количество потоков должно быть положительным числом\n");
     }
 
+    printf("PID: %d\n", getpid()); // полезно при демонстрации потоков ОС
+
     int *original = malloc(array_size * sizeof(int));
     int *seq_result = malloc(array_size * sizeof(int));
     int *par_result = malloc(array_size * sizeof(int));
@@ -36,44 +38,46 @@ int main(int argc, char **argv) {
         write_exit("Ошибка выделения памяти\n");
     }
 
-
     srand((unsigned)time(NULL));
     generate_array(original, array_size);
     memcpy(seq_result, original, array_size * sizeof(int));
     memcpy(par_result, original, array_size * sizeof(int));
 
-    double seq_time = get_current_time();
+    // Последовательная сортировка
+    double seq_t0 = get_current_time();
     sequential_batcher_sort(seq_result, array_size);
-    seq_time = get_current_time() - seq_time;
+    double seq_time = get_current_time() - seq_t0;
 
-    double par_time = get_current_time();
+    // Параллельная сортировка (замер полной параллельной процедуры)
+    double par_t0 = get_current_time();
     parallel_batcher_sort(par_result, array_size, num_threads);
-    par_time = get_current_time() - par_time;
+    double par_time = get_current_time() - par_t0;
 
     double speedup = seq_time / par_time;
-    double eff = (speedup / num_threads) * 100.0;
+    double eff = speedup / num_threads;
+
 
     int seq_correct = is_sorted(seq_result, array_size);
     int par_correct = is_sorted(par_result, array_size);
 
     char output[512];
     int len = 0;
-    
-    len += snprintf(output + len, sizeof(output) - len, 
-                   "Последовательная сортировка завершена за: %.4f секунд\n", seq_time);
+
     len += snprintf(output + len, sizeof(output) - len,
-                   "Параллельная сортировка завершена за: %.4f секунд\n", par_time);
+                    "Последовательная сортировка завершена за: %.2f мс\n", seq_time * 1000.0);
     len += snprintf(output + len, sizeof(output) - len,
-                   "Ускорение: %.2fx\n", speedup);
+                    "Параллельная сортировка завершена за: %.2f мс\n", par_time * 1000.0);
     len += snprintf(output + len, sizeof(output) - len,
-                   "Эффективность: %.1f%%\n", eff);
-    
+                    "Ускорение: %.2fx\n", speedup);
+    len += snprintf(output + len, sizeof(output) - len,
+                    "Эффективность: %.2f\n", eff);
+
     if (seq_correct && par_correct) {
         len += snprintf(output + len, sizeof(output) - len,
-                       "Корректная сортировка: ДА\n");
+                        "Корректная сортировка: ДА\n");
     } else {
         len += snprintf(output + len, sizeof(output) - len,
-                       "Корректная сортировка: НЕТ\n");
+                        "Корректная сортировка: НЕТ\n");
     }
 
     write(STDOUT_FILENO, output, len);
@@ -81,6 +85,6 @@ int main(int argc, char **argv) {
     free(original);
     free(seq_result);
     free(par_result);
-    
+
     return 0;
 }
